@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 
+#define LOAD_FACTOR_THRESHOLD 0.7
+
 typedef struct KeyValue {
     char *key;
     int value;
@@ -34,7 +36,36 @@ HashMap *init_hashmap(int capacity) {
     return map;
 }
 
+void resize(HashMap *map) {
+    int newCapacity = map->capacity * 2;
+    KeyValue **newTable = (KeyValue **)calloc(newCapacity, sizeof(KeyValue*));
+
+    // Rehash
+    for (int i = 0; i < map->capacity; i++) {
+        KeyValue *current = map->buckets[i];
+        while (current) {
+            KeyValue *next = current->next;
+            unsigned int index = hash(current->key) % newCapacity;
+
+            // insert to new table
+            current->next = newTable[index];
+            newTable[index] = current;
+
+            current = next;
+        }
+    }
+
+    // update hashmap
+    free(map->buckets);
+    map->buckets = newTable;
+    map->capacity = newCapacity;
+}
+
 void insert(HashMap *map, const char *key, int value) {
+    if ((double)map->size / map->capacity > LOAD_FACTOR_THRESHOLD) {
+        resize(map);
+    }
+
     unsigned long index = hash(key) % map->capacity;
     printf("HASH: %lu\t", hash(key));
     printf("INDEX: %lu\n", index);
@@ -124,10 +155,12 @@ void benchmark() {
 
 int main() {
     //benchmark();
-    HashMap *map = init_hashmap(3);
+    HashMap *map = init_hashmap(2);
+    printf("Current HashMaps capacity: %d\n", map->capacity);
     insert(map, "apple", 12);
     insert(map, "jaja", 44);
     insert(map, "orange", 333);
+    printf("After HashMaps capacity: %d\n", map->capacity);
 
     int found;
     int value = search(map, "orange", &found);
